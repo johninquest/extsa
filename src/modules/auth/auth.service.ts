@@ -1,6 +1,7 @@
 import User from '../user/user.model'; // Adjusted import to default import
 import sequelize from '../../config/db/sqlite';
 import { Transaction } from 'sequelize';
+import { sendWelcomeEmail } from '../notification/email'; // Import the email sending function
 
 interface FirebaseUserData {
   uid: string;
@@ -27,7 +28,10 @@ export class AuthService {
         transaction
       });
 
-      if (!created) {
+      if (created) {
+        // Send welcome email
+        await sendWelcomeEmail(user.email, user.displayName || 'TheFreded');
+      } else {
         await user.update({
           displayName: firebaseUser.displayName || user.displayName,
           photoURL: firebaseUser.photoURL || user.photoURL,
