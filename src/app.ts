@@ -1,9 +1,17 @@
 import express, { Express, Request, Response } from "express";
+import helmet from "helmet";
+import cors from "cors";
 import authRoutes from "./modules/auth/auth.routes"; // Adjust the import path as needed
 import Logger from "./config/logger"; // Adjust the import path as needed
 import { handleJsonParsingError, handleError } from "./middleware/error.middleware"; // Adjust the import path as needed
 
-const app: Express = express();
+const app: Express = express(); 
+
+// Security middleware
+app.use(helmet());
+
+// Enable CORS
+app.use(cors());
 
 // Regular middleware
 app.use(express.json());
