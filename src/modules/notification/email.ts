@@ -5,7 +5,7 @@ import "dotenv/config";
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST,
   port: parseInt(process.env.SMTP_PORT || "587", 10),
-  secure: process.env.EMAIL_SECURE === "true", // true for 465, false for other ports
+  secure: process.env.SMTP_SECURE === "true", // true for 465, false for other ports
   auth: {
     user: process.env.SMTP_EMAIL,
     pass: process.env.SMTP_PASSWORD,
@@ -24,7 +24,7 @@ const transporter = nodemailer.createTransport({
 
 export const sendWelcomeEmail = async (to: string, displayName: string) => {
   const mailOptions = {
-    from: process.env.EMAIL_FROM,
+    from: process.env.SMTP_EMAIL,
     to,
     subject: "Welcome to PoliSync - Your Insurance Simplified",
     text: `Hello ${displayName},

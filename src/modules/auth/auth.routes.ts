@@ -18,7 +18,7 @@ router.use(logRequest);
 router.use(logResponse);
 
 router.post(
-  "/google",
+  "/confirmation",
   [authLimiter, asyncHandler(verifyFirebaseToken)],
   asyncHandler((req, res, next) => controller.handleSocialAuth(req, res, next))
 );
