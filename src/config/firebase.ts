@@ -1,7 +1,6 @@
+// src/config/firebase.ts
 import admin from "firebase-admin";
 import { Request, Response, NextFunction } from "express";
-// import { readFileSync } from "fs";
-// import { join } from "path";
 import Logger from "./logger";
 import "dotenv/config";
 

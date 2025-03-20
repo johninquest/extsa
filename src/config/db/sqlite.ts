@@ -16,7 +16,8 @@ const sequelize = new Sequelize({
 export default sequelize;
 
 // Import models
-import User from '../../modules/user/user.model';
+import User from '../../modules/user/user.model'; 
+import Policy from '../../modules/policy/policy.model';
 
 // Test the connection and initialize models
 export const initializeDatabase = async (): Promise<Sequelize> => {
@@ -27,6 +28,8 @@ export const initializeDatabase = async (): Promise<Sequelize> => {
     // Sync models (creates tables if they don't exist)
     await User.sync();
     Logger.info('User model synchronized successfully.');
+    await Policy.sync();
+    Logger.info('Policy model synchronized successfully.');
     
     return sequelize;
   } catch (error) {

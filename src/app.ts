@@ -1,7 +1,9 @@
+// src/app.ts
 import express, { Express, Request, Response } from "express";
 import helmet from "helmet";
 import cors from "cors";
-import authRoutes from "./modules/auth/auth.routes"; // Adjust the import path as needed
+import authRoutes from "./modules/auth/auth.routes"; // Adjust the import path as needed 
+import policyRoutes from "./modules/policy/policy.routes";
 import Logger from "./config/logger"; // Adjust the import path as needed
 import { handleJsonParsingError, handleError } from "./middleware/error.middleware"; // Adjust the import path as needed
 
@@ -17,7 +19,8 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
-app.use("/auth", authRoutes);
+app.use("/api/auth", authRoutes);
+app.use("/api/policies", policyRoutes); 
 app.get("/", (req: Request, res: Response) => {
   Logger.info("GET / request received");
   res.json({ message: "Hello Express API!" });

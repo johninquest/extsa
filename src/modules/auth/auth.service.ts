@@ -30,7 +30,7 @@ export class AuthService {
 
       if (created) {
         // Send welcome email
-        await sendWelcomeEmail(user.email, user.displayName || 'TheFreded');
+        await sendWelcomeEmail(user.email, user.displayName || 'User');
       } else {
         await user.update({
           displayName: firebaseUser.displayName || user.displayName,

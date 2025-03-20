@@ -1,3 +1,4 @@
+// src/modules/auth/auth.middleware.ts
 import rateLimit from 'express-rate-limit';
 
 export const authLimiter = rateLimit({

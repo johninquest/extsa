@@ -1,5 +1,5 @@
 import app from "./app";
-import { initializeDatabase } from "./config/db/sqlite"; // Adjust the import path as needed
+import { initializeDatabase } from "./config/db/sqlite";
 import Logger from "./config/logger";
 import "dotenv/config";
 
