@@ -1,3 +1,4 @@
+// src/modules/policy/policy.model.ts
 import { DataTypes, Model, Optional } from 'sequelize';
 import { customAlphabet } from 'nanoid';
 import sequelize from '../../config/db/sqlite'; // Adjust the import path as needed
@@ -17,11 +18,13 @@ interface PolicyAttributes {
   created_by: string;
   premium: number;
   payment_frequency: number;
+  agent?: string;
+  claims: string[];
   created: Date;
   updated: Date;
 }
 
-interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'created' | 'updated'> {}
+interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'claims' | 'created' | 'updated'> {}
 
 class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implements PolicyAttributes {
   public id!: string;
@@ -35,6 +38,8 @@ class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implement
   public created_by!: string;
   public premium!: number;
   public payment_frequency!: number;
+  public agent?: string; // New field for agent - optional
+  public claims!: string[]; // New field for array of claims
   public created!: Date;
   public updated!: Date;
 
@@ -91,6 +96,15 @@ Policy.init(
       type: DataTypes.INTEGER,
       allowNull: false,
     },
+    agent: {
+      type: DataTypes.STRING,
+      allowNull: true,
+    },
+    claims: {
+      type: DataTypes.JSON, // Using JSON type to store an array of strings
+      allowNull: true,
+      defaultValue: [], // Default to empty array
+    },
     created: {
       type: DataTypes.DATE,
       defaultValue: DataTypes.NOW,
@@ -113,5 +127,7 @@ Policy.init(
 // You might want to add associations here
 // For example, if policies belong to users:
 // Policy.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
+// Policy.belongsTo(Agent, { foreignKey: 'agent', as: 'agentRelation' });
+// Policy.hasMany(Claim, { foreignKey: 'policy_id', as: 'claims' });
 
 export default Policy;

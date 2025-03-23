@@ -1,6 +1,6 @@
 {
   "name": "extsa",
-  "version": "0.3.19",
+  "version": "0.3.24",
   "main": "src/server.ts",
   "scripts": {
     "start": "ts-node src/server.ts",

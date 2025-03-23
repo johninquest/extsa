@@ -1,3 +1,4 @@
+// src/modules/policy/policy.validator.ts
 import Joi from 'joi';
 
 export const policySchema = Joi.object({
@@ -12,6 +13,8 @@ export const policySchema = Joi.object({
   created_by: Joi.string().required(),
   premium: Joi.number().required().min(0),
   payment_frequency: Joi.number().integer().required().min(0),
+  agent: Joi.string().optional().allow(null, ''),
+  claims: Joi.array().items(Joi.string()).optional().default([]),
   created: Joi.date().optional(),
   updated: Joi.date().optional(),
 });
