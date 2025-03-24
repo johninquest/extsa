@@ -20,11 +20,12 @@ interface PolicyAttributes {
   payment_frequency: number;
   agent?: string;
   claims: string[];
+  deleted_at?: Date; // New field for soft delete
   created: Date;
   updated: Date;
 }
 
-interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'claims' | 'created' | 'updated'> {}
+interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'claims' | 'deleted_at' | 'created' | 'updated'> {}
 
 class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implements PolicyAttributes {
   public id!: string;
@@ -40,6 +41,7 @@ class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implement
   public payment_frequency!: number;
   public agent?: string; // New field for agent - optional
   public claims!: string[]; // New field for array of claims
+  public deleted_at?: Date; // New field for soft delete
   public created!: Date;
   public updated!: Date;
 
@@ -104,6 +106,11 @@ Policy.init(
       type: DataTypes.JSON, // Using JSON type to store an array of strings
       allowNull: true,
       defaultValue: [], // Default to empty array
+    },
+    deleted_at: {
+      type: DataTypes.DATE,
+      allowNull: true,
+      defaultValue: null,
     },
     created: {
       type: DataTypes.DATE,

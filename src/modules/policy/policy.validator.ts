@@ -15,6 +15,7 @@ export const policySchema = Joi.object({
   payment_frequency: Joi.number().integer().required().min(0),
   agent: Joi.string().optional().allow(null, ''),
   claims: Joi.array().items(Joi.string()).optional().default([]),
+  deleted_at: Joi.date().optional().allow(null),
   created: Joi.date().optional(),
   updated: Joi.date().optional(),
 });
@@ -45,4 +46,13 @@ export const validatePolicyUpdate = (policy: any) => {
   );
   
   return updateSchema.validate(policy, { abortEarly: false });
+};
+
+// Add specific validation for soft delete operation if needed
+export const validatePolicyDelete = (policy: any) => {
+  const deleteSchema = Joi.object({
+    deleted_at: Joi.date().required()
+  });
+  
+  return deleteSchema.validate(policy, { abortEarly: false });
 };
