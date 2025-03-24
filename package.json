@@ -1,10 +1,6 @@
 {
   "name": "extsa",
-<<<<<<< HEAD
-  "version": "0.3.17",
-=======
-  "version": "0.3.19",
->>>>>>> 895b49a7d2f1069e4409b6a5c9ebc0c416f17124
+  "version": "0.3.24",
   "main": "src/server.ts",
   "scripts": {
     "start": "ts-node src/server.ts",
