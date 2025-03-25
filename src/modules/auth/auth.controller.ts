@@ -10,7 +10,7 @@ interface AuthResponse {
     photoURL?: string;
     provider?: string;
     role: string;
-    lastLogin?: Date;
+    lastLogin?: Date | null;
   };
 }
 
@@ -35,15 +35,20 @@ export class AuthController {
         provider: req.user.provider,
       });
 
+      // Make sure user is not null before accessing properties
+      if (!user) {
+        throw new Error("Failed to create or retrieve user");
+      }
+
       const response: AuthResponse = {
         user: {
           id: user.id,
           email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          provider: user.provider,
+          displayName: user.displayName || undefined,
+          photoURL: user.photoURL || undefined,
+          provider: user.provider || undefined,
           role: user.role,
-          lastLogin: user.lastLogin,
+          lastLogin: user.lastLogin || null,
         },
       };
 
@@ -74,11 +79,11 @@ export class AuthController {
         user: {
           id: user.id,
           email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          provider: user.provider,
+          displayName: user.displayName || null,
+          photoURL: user.photoURL || null,
+          provider: user.provider || null,
           role: user.role,
-          lastLogin: user.lastLogin,
+          lastLogin: user.lastLogin || null,
         },
       });
     } catch (error) {

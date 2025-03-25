@@ -33,8 +33,8 @@ const sequelize = new Sequelize({
 export default sequelize;
 
 // Import models
-import User from "../../modules/user/user.model";
-import Policy from "../../modules/policy/policy.model";
+// import User from "../../modules/user/user.model";
+// import Policy from "../../modules/policy/policy.model";
 
 // Test the connection and initialize models
 export const initializeDatabase = async (): Promise<Sequelize> => {
@@ -45,7 +45,7 @@ export const initializeDatabase = async (): Promise<Sequelize> => {
         process.env.NODE_ENV || "development"
       }`
     );
-
+/* 
     // Enable Write-Ahead Logging (WAL)
     await sequelize.query("PRAGMA journal_mode=WAL;");
     Logger.info("Write-Ahead Logging (WAL) mode enabled.");
@@ -54,7 +54,7 @@ export const initializeDatabase = async (): Promise<Sequelize> => {
     await User.sync();
     Logger.info("User model synchronized successfully.");
     await Policy.sync();
-    Logger.info("Policy model synchronized successfully.");
+    Logger.info("Policy model synchronized successfully."); */
 
     return sequelize;
   } catch (error) {

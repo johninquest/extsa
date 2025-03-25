@@ -1,140 +1,71 @@
 // src/modules/policy/policy.model.ts
-import { DataTypes, Model, Optional } from 'sequelize';
 import { customAlphabet } from 'nanoid';
-import sequelize from '../../config/db/sqlite'; // Adjust the import path as needed
 
+// Custom ID generation
 const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const generateId = customAlphabet(alphabet, 21);
+export const generateId = customAlphabet(alphabet, 21);
 
-interface PolicyAttributes {
+// Type definitions for policy
+export interface PolicyInterface {
   id: string;
-  policy_type: string;
-  policy_number: string;
-  insurance_provider: string;
-  policy_comment?: string;
-  start_date?: Date;
-  end_date: Date;
-  automatic_renewal: boolean;
-  created_by: string;
+  policyType: string;
+  policyNumber: string;
+  insuranceProvider: string;
+  policyComment?: string | null;
+  startDate?: Date | null;
+  endDate: Date;
+  automaticRenewal: boolean;
+  createdBy: string;
   premium: number;
-  payment_frequency: number;
-  agent?: string;
-  claims: string[];
-  deleted_at?: Date; // New field for soft delete
+  paymentFrequency: number;
+  agent?: string | null;
+  claims: string[]; // We'll handle conversion to/from JSON string
+  deletedAt?: Date | null;
   created: Date;
   updated: Date;
 }
 
-interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'claims' | 'deleted_at' | 'created' | 'updated'> {}
-
-class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implements PolicyAttributes {
-  public id!: string;
-  public policy_type!: string;
-  public policy_number!: string;
-  public insurance_provider!: string;
-  public policy_comment?: string;
-  public start_date?: Date;
-  public end_date!: Date;
-  public automatic_renewal!: boolean;
-  public created_by!: string;
-  public premium!: number;
-  public payment_frequency!: number;
-  public agent?: string; // New field for agent - optional
-  public claims!: string[]; // New field for array of claims
-  public deleted_at?: Date; // New field for soft delete
-  public created!: Date;
-  public updated!: Date;
-
-  // timestamps!
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+// Interface for policy creation
+export interface PolicyCreateInput {
+  policyType: string;
+  policyNumber: string;
+  insuranceProvider: string;
+  policyComment?: string | null;
+  startDate?: Date | null;
+  endDate: Date;
+  automaticRenewal?: boolean;
+  createdBy: string;
+  premium: number;
+  paymentFrequency: number;
+  agent?: string | null;
+  claims?: string[];
 }
 
-Policy.init(
-  {
-    id: {
-      type: DataTypes.STRING(21),
-      primaryKey: true,
-      defaultValue: () => generateId(),
-    },
-    policy_type: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    policy_number: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    insurance_provider: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    policy_comment: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    start_date: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    end_date: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
-    automatic_renewal: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-    created_by: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    premium: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-    },
-    payment_frequency: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    agent: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    claims: {
-      type: DataTypes.JSON, // Using JSON type to store an array of strings
-      allowNull: true,
-      defaultValue: [], // Default to empty array
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: null,
-    },
-    created: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
-    updated: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
-  },
-  {
-    sequelize, // Pass the sequelize instance here
-    tableName: 'policies',
-    underscored: true,
-    timestamps: true,
-    createdAt: 'created',
-    updatedAt: 'updated',
+// Interface for policy updates
+export interface PolicyUpdateInput {
+  policyType?: string;
+  policyNumber?: string;
+  insuranceProvider?: string;
+  policyComment?: string | null;
+  startDate?: Date | null;
+  endDate?: Date;
+  automaticRenewal?: boolean;
+  premium?: number;
+  paymentFrequency?: number;
+  agent?: string | null;
+  claims?: string[];
+}
+
+// Helper functions to convert between claims array and JSON string
+export const stringifyClaims = (claims: string[] = []): string => {
+  return JSON.stringify(claims);
+};
+
+export const parseClaims = (claimsJson: string): string[] => {
+  try {
+    const parsed = JSON.parse(claimsJson);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (e) {
+    return [];
   }
-);
-
-// You might want to add associations here
-// For example, if policies belong to users:
-// Policy.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
-// Policy.belongsTo(Agent, { foreignKey: 'agent', as: 'agentRelation' });
-// Policy.hasMany(Claim, { foreignKey: 'policy_id', as: 'claims' });
-
-export default Policy;
+};

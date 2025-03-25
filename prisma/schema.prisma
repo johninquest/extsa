@@ -1,0 +1,51 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  firebaseUid String    @unique
+  email       String    @unique
+  displayName String?
+  photoURL    String?
+  provider    String?
+  role        String    @default("admin")
+  lastLogin   DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  policies    Policy[]  @relation("UserPolicies")
+
+  @@map("users")
+}
+
+model Policy {
+  id                String    @id @default(cuid())
+  policyType        String    @map("policy_type")
+  policyNumber      String    @map("policy_number")
+  insuranceProvider String    @map("insurance_provider")
+  policyComment     String?   @map("policy_comment")
+  startDate         DateTime? @map("start_date")
+  endDate           DateTime  @map("end_date")
+  automaticRenewal  Boolean   @default(false) @map("automatic_renewal")
+  createdBy         String    @map("created_by")
+  premium           Float
+  paymentFrequency  Int       @map("payment_frequency")
+  agent             String?
+  claims            String    @default("[]") // Store as JSON string
+  deletedAt         DateTime? @map("deleted_at")
+  created           DateTime  @default(now())
+  updated           DateTime  @updatedAt
+  
+  // Relation to User
+  user              User      @relation("UserPolicies", fields: [createdBy], references: [email])
+  
+  @@index([createdBy])
+  @@map("policies")
+}

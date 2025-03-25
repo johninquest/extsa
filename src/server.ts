@@ -1,5 +1,6 @@
+// src/server.ts
 import app from "./app";
-import { initializeDatabase } from "./config/db/sqlite";
+import { initializeDatabase } from "./config/db/prisma";
 import Logger from "./config/logger";
 import "dotenv/config";
 
@@ -13,7 +14,7 @@ const startServer = async () => {
 
     app.listen(port, () => {
       Logger.info(`Server running on port => ${port}`);
-      // Logger.info(`Swagger docs available at http://localhost:${port}/api-docs`);
+      /* Logger.info(`Swagger docs available at http://localhost:${port}/api-docs`); */
       Logger.info(`Environment: ${process.env.NODE_ENV}`);
     });
   } catch (error) {

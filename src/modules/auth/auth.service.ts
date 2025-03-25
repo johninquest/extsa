@@ -1,7 +1,21 @@
-import User from '../user/user.model'; // Adjusted import to default import
-import sequelize from '../../config/db/sqlite';
-import { Transaction } from 'sequelize';
-import { sendWelcomeEmail } from '../notification/email'; // Import the email sending function
+// src/modules/auth/auth.service.ts
+import prisma from '../../config/db/prisma';
+import { generateId, UserRole } from '../user/user.model';
+import { sendWelcomeEmail } from '../notification/email';
+
+// Define the User type manually to match your Prisma schema
+interface User {
+  id: string;
+  firebaseUid: string;
+  email: string;
+  displayName?: string | null;
+  photoURL?: string | null;
+  provider?: string | null;
+  role: string;
+  lastLogin?: Date | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
 
 interface FirebaseUserData {
   uid: string;
@@ -12,38 +26,59 @@ interface FirebaseUserData {
 }
 
 export class AuthService {
-  async findOrCreateUser(firebaseUser: FirebaseUserData): Promise<User> {
-    return sequelize.transaction(async (transaction: Transaction) => {
-      const [user, created] = await User.findOrCreate({
-        where: { firebaseUid: firebaseUser.uid },
-        defaults: {
-          firebaseUid: firebaseUser.uid,
-          email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
-          provider: firebaseUser.provider,
-          role: 'user', // Override model's default 'admin' for social logins
-          lastLogin: new Date()
-        },
-        transaction
+  async findOrCreateUser(firebaseUser: FirebaseUserData): Promise<User | null> {
+    try {
+      // Try to find the user first
+      const existingUser = await prisma.user.findUnique({
+        where: { firebaseUid: firebaseUser.uid }
       });
 
-      if (created) {
-        // Send welcome email
-        await sendWelcomeEmail(user.email, user.displayName || 'User');
+      if (existingUser) {
+        // User exists, update their details and last login
+        const updatedUser = await prisma.user.update({
+          where: { id: existingUser.id },
+          data: {
+            displayName: firebaseUser.displayName || existingUser.displayName,
+            photoURL: firebaseUser.photoURL || existingUser.photoURL,
+            lastLogin: new Date()
+          }
+        });
+        
+        return updatedUser;
       } else {
-        await user.update({
-          displayName: firebaseUser.displayName || user.displayName,
-          photoURL: firebaseUser.photoURL || user.photoURL,
-          lastLogin: new Date()
-        }, { transaction });
-      }
+        // User doesn't exist, create a new one
+        const newUser = await prisma.user.create({
+          data: {
+            id: generateId(),
+            firebaseUid: firebaseUser.uid,
+            email: firebaseUser.email,
+            displayName: firebaseUser.displayName,
+            photoURL: firebaseUser.photoURL,
+            provider: firebaseUser.provider,
+            role: 'user' as UserRole, // Override model's default 'admin' for social logins
+            lastLogin: new Date()
+          }
+        });
 
-      return user;
-    });
+        // Send welcome email after creation
+        await sendWelcomeEmail(newUser.email, newUser.displayName || 'User');
+        
+        return newUser;
+      }
+    } catch (error) {
+      console.error("Error in findOrCreateUser:", error);
+      return null;
+    }
   }
 
   async getUserById(id: string): Promise<User | null> {
-    return User.findByPk(id);
+    try {
+      return await prisma.user.findUnique({
+        where: { id }
+      });
+    } catch (error) {
+      console.error("Error in getUserById:", error);
+      return null;
+    }
   }
 }

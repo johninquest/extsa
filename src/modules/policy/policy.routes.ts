@@ -1,14 +1,13 @@
 // src/modules/policy/policy.routes.ts
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
-import Policy from "./policy.model";
+import PolicyRepository from "./policy.repository";
 import { validatePolicy, validatePolicyUpdate } from "./policy.validator";
 import { authLimiter } from "../auth/auth.middleware";
 import { verifyFirebaseToken } from "../../config/firebase";
 import policyMiddleware from "./policy.middleware";
 import Logger from "../../config/logger";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { where, col } from "sequelize";
 
 const router = express.Router();
 
@@ -43,13 +42,7 @@ router.get(
       });
     }
 
-    const policies = await Policy.findAll({
-      where: [
-        { created_by: req.user.email },
-        where(col("deleted_at"), "IS", null),
-      ],
-      order: [["updated", "DESC"]],
-    });
+    const policies = await PolicyRepository.findByUserEmail(req.user.email);
 
     Logger.info(`Policies retrieved successfully for user ${req.user.email}`, {
       count: policies.length,
@@ -87,7 +80,7 @@ router.get(
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
     // Check if policy is deleted
-    if (req.policy.deleted_at) {
+    if (req.policy.deletedAt) {
       Logger.warn(`Attempt to access deleted policy`, {
         policyId: req.params.id,
         method: "GET",
@@ -135,7 +128,7 @@ router.post(
     }
 
     // Add this line to set created_by BEFORE validation
-    req.body.created_by = req.user.email;
+    req.body.createdBy = req.user.email;
 
     // Validate the request body
     const { error, value } = validatePolicy(req.body);
@@ -154,15 +147,15 @@ router.post(
       });
     }
 
-    // Set the created_by field to the authenticated user's email
-    value.created_by = req.user.email;
+    // Set the createdBy field to the authenticated user's email
+    value.createdBy = req.user.email;
 
     // Create the policy
-    const policy = await Policy.create(value);
+    const policy = await PolicyRepository.create(value);
 
     Logger.info(`Policy created successfully`, {
       policyId: policy.id,
-      policyType: policy.policy_type,
+      policyType: policy.policyType,
       method: "POST",
       url: req.originalUrl,
       user: req.user.email,
@@ -186,7 +179,7 @@ router.put(
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
     // Check if policy is deleted
-    if (req.policy.deleted_at) {
+    if (req.policy.deletedAt) {
       Logger.warn(`Attempt to update deleted policy`, {
         policyId: req.params.id,
         method: "PUT",
@@ -217,12 +210,12 @@ router.put(
       });
     }
 
-    // Prevent changing the created_by field
-    if (value.created_by && value.created_by !== req.user?.email) {
+    // Prevent changing the createdBy field
+    if (value.createdBy && value.createdBy !== req.user?.email) {
       Logger.warn(`Attempt to change policy ownership prevented`, {
         policyId: req.params.id,
         originalOwner: req.user?.email,
-        attemptedOwner: value.created_by,
+        attemptedOwner: value.createdBy,
         method: "PUT",
         url: req.originalUrl,
       });
@@ -232,9 +225,9 @@ router.put(
       });
     }
 
-    // Prevent changing the deleted_at field through PUT
-    if (value.deleted_at !== undefined) {
-      Logger.warn(`Attempt to modify deleted_at field prevented`, {
+    // Prevent changing the deletedAt field through PUT
+    if (value.deletedAt !== undefined) {
+      Logger.warn(`Attempt to modify deletedAt field prevented`, {
         policyId: req.params.id,
         method: "PUT",
         url: req.originalUrl,
@@ -247,11 +240,11 @@ router.put(
     }
 
     // Update the policy
-    await req.policy.update(value);
+    const updatedPolicy = await PolicyRepository.update(req.policy.id, value);
 
     Logger.info(`Policy updated successfully`, {
       policyId: req.params.id,
-      policyType: req.policy.policy_type,
+      policyType: updatedPolicy.policyType,
       method: "PUT",
       url: req.originalUrl,
       user: req.user?.email,
@@ -260,7 +253,7 @@ router.put(
 
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: updatedPolicy,
     });
   })
 );
@@ -276,7 +269,7 @@ router.patch(
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
     // Check if policy is deleted
-    if (req.policy.deleted_at) {
+    if (req.policy.deletedAt) {
       Logger.warn(`Attempt to patch deleted policy`, {
         policyId: req.params.id,
         method: "PATCH",
@@ -307,12 +300,12 @@ router.patch(
       });
     }
 
-    // Prevent changing the created_by field
-    if (value.created_by && value.created_by !== req.user?.email) {
+    // Prevent changing the createdBy field
+    if (value.createdBy && value.createdBy !== req.user?.email) {
       Logger.warn(`Attempt to change policy ownership prevented`, {
         policyId: req.params.id,
         originalOwner: req.user?.email,
-        attemptedOwner: value.created_by,
+        attemptedOwner: value.createdBy,
         method: "PATCH",
         url: req.originalUrl,
       });
@@ -322,9 +315,9 @@ router.patch(
       });
     }
 
-    // Prevent changing the deleted_at field through PATCH
-    if (value.deleted_at !== undefined) {
-      Logger.warn(`Attempt to modify deleted_at field prevented`, {
+    // Prevent changing the deletedAt field through PATCH
+    if (value.deletedAt !== undefined) {
+      Logger.warn(`Attempt to modify deletedAt field prevented`, {
         policyId: req.params.id,
         method: "PATCH",
         url: req.originalUrl,
@@ -336,36 +329,28 @@ router.patch(
       });
     }
 
-    // Apply only the submitted fields to the policy
-    const fieldsToUpdate = Object.keys(value);
-    for (const field of fieldsToUpdate) {
-      if (field !== "id" && field !== "created_by" && field !== "deleted_at") {
-        req.policy[field] = value[field];
-      }
-    }
-
-    // Save the updated policy
-    await req.policy.save();
+    // Update the policy with only the provided fields
+    const updatedPolicy = await PolicyRepository.update(req.policy.id, value);
 
     Logger.info(`Policy partially updated successfully`, {
       policyId: req.params.id,
-      policyType: req.policy.policy_type,
+      policyType: updatedPolicy.policyType,
       method: "PATCH",
       url: req.originalUrl,
       user: req.user?.email,
-      changedFields: fieldsToUpdate.join(", "),
+      changedFields: Object.keys(value).join(", "),
     });
 
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: updatedPolicy,
     });
   })
 );
 
 /**
  * @route DELETE /api/policies/:id
- * @desc Soft delete a policy by setting deleted_at
+ * @desc Soft delete a policy by setting deletedAt
  * @access Private
  */
 router.delete(
@@ -374,7 +359,7 @@ router.delete(
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
     // Check if policy is already deleted
-    if (req.policy.deleted_at) {
+    if (req.policy.deletedAt) {
       Logger.warn(`Attempt to delete already deleted policy`, {
         policyId: req.params.id,
         method: "DELETE",
@@ -390,12 +375,12 @@ router.delete(
     // Store policy info before soft-deletion for logging
     const policyInfo = {
       id: req.policy.id,
-      type: req.policy.policy_type,
-      number: req.policy.policy_number,
+      type: req.policy.policyType,
+      number: req.policy.policyNumber,
     };
 
-    // Soft delete the policy by setting deleted_at
-    await req.policy.update({ deleted_at: new Date() });
+    // Soft delete the policy by setting deletedAt
+    await PolicyRepository.softDelete(req.policy.id);
 
     Logger.info(`Policy soft-deleted successfully`, {
       policyId: policyInfo.id,
@@ -424,7 +409,7 @@ router.post(
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
     // Check if policy is actually deleted
-    if (!req.policy.deleted_at) {
+    if (!req.policy.deletedAt) {
       Logger.warn(`Attempt to restore a non-deleted policy`, {
         policyId: req.params.id,
         method: "POST",
@@ -437,12 +422,12 @@ router.post(
       });
     }
 
-    // Restore the policy by clearing deleted_at
-    await req.policy.update({ deleted_at: null });
+    // Restore the policy by clearing deletedAt
+    const restoredPolicy = await PolicyRepository.restore(req.policy.id);
 
     Logger.info(`Policy restored successfully`, {
       policyId: req.policy.id,
-      policyType: req.policy.policy_type,
+      policyType: req.policy.policyType,
       method: "POST",
       url: req.originalUrl,
       user: req.user?.email,
@@ -450,7 +435,7 @@ router.post(
 
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: restoredPolicy,
     });
   })
 );

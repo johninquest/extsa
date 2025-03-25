@@ -1,13 +1,13 @@
 // src/modules/policy/policy.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import Policy from './policy.model';
+import PolicyRepository from './policy.repository';
 import Logger from '../../config/logger';
 
 // Extend the Express Request interface to include policy
 declare global {
   namespace Express {
     interface Request {
-      policy?: any; // Using any here, but ideally should match your Policy model type
+      policy?: any; // Ideally this would be more strongly typed
     }
   }
 }
@@ -45,7 +45,7 @@ export const checkPolicyOwnership = async (req: Request, res: Response, next: Ne
         error: 'Policy ID is required'
       });
     }
-
+    
     // Ensure user is authenticated and has an email
     if (!req.user?.email) {
       return res.status(401).json({
@@ -53,21 +53,16 @@ export const checkPolicyOwnership = async (req: Request, res: Response, next: Ne
         error: 'Authentication required to access this policy'
       });
     }
-
-    const policy = await Policy.findOne({
-      where: { 
-        id: policyId,
-        created_by: req.user.email 
-      }
-    });
-
+    
+    const policy = await PolicyRepository.findByIdAndEmail(policyId, req.user.email);
+    
     if (!policy) {
       return res.status(404).json({
         success: false,
         error: 'Policy not found or you do not have permission to access it'
       });
     }
-
+    
     // Attach the policy to the request object for use in route handlers
     req.policy = policy;
     next();
