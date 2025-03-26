@@ -1,4 +1,4 @@
-version: '3.9'
+version: '3.10'
 
 services:
   api:
@@ -9,13 +9,22 @@ services:
       - NODE_ENV=production
       # Add any environment variables your app needs here
     volumes:
-      # This volume is for SQLite database persistence
+      # SQLite database in data directory at project root level (same level as src)
       - sqlite-data:/usr/src/app/data
     labels:
       - "traefik.enable=true"
-      - "traefik.http.routers.api.rule=Host(`api.polisync.de`)"
-      - "traefik.http.routers.api.entrypoints=websecure"
-      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      
+      # Domain-based routing
+      - "traefik.http.routers.api-domain.rule=Host(`api.polisync.de`)"
+      - "traefik.http.routers.api-domain.entrypoints=websecure"
+      - "traefik.http.routers.api-domain.tls.certresolver=letsencrypt"
+      
+      # IP-based routing (no TLS) over port 80
+      - "traefik.http.routers.api-ip.rule=HostRegexp(`{ip:[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}\\.[0-9]{1,3}}`)"
+      - "traefik.http.routers.api-ip.entrypoints=web"
+      - "traefik.http.routers.api-ip.priority=1"
+      
+      # Default service
       - "traefik.http.services.api.loadbalancer.server.port=3000"
     restart: unless-stopped
     networks:
@@ -39,9 +48,10 @@ services:
       # Entry points configuration
       - "--entrypoints.web.address=:80"
       - "--entrypoints.websecure.address=:443"
-      # HTTP to HTTPS redirect
+      # HTTP to HTTPS redirect (only for domain, not IP)
       - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
       - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      - "--entrypoints.web.http.redirections.entrypoint.priority=10"
       # Let's Encrypt configuration
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
       - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
