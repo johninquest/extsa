@@ -25,8 +25,8 @@ app.use((req, res, next) => {
 app.use(express.json()); 
 
 // Routes
-app.use("/api/auth", authRoutes);
-app.use("/api/policies", policyRoutes); 
+app.use("/auth", authRoutes);
+app.use("/policies", policyRoutes); 
 
 // Default route
 app.get("/", (req: Request, res: Response) => {

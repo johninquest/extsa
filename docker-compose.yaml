@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - NODE_ENV=production
+      # Add any environment variables your app needs here
+    volumes:
+      # This volume is for SQLite database persistence
+      - sqlite-data:/usr/src/app/data
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.api.rule=Host(`api.polisync.de`)"
+      - "traefik.http.routers.api.entrypoints=websecure"
+      - "traefik.http.routers.api.tls.certresolver=letsencrypt"
+      - "traefik.http.services.api.loadbalancer.server.port=3000"
+    restart: unless-stopped
+    networks:
+      - traefik-network
+
+  traefik:
+    image: traefik:v2.10
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - traefik-certificates:/letsencrypt
+    command:
+      # API and dashboard configuration
+      - "--api.insecure=false"
+      # Docker provider configuration
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-network"
+      # Entry points configuration
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # HTTP to HTTPS redirect
+      - "--entrypoints.web.http.redirections.entrypoint.to=websecure"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # Let's Encrypt configuration
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=your-email@example.com"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
+      # Log configuration
+      - "--log.level=INFO"
+    networks:
+      - traefik-network
+    restart: unless-stopped
+
+networks:
+  traefik-network:
+    driver: bridge
+
+volumes:
+  sqlite-data:
+    driver: local
+  traefik-certificates:
+    driver: local

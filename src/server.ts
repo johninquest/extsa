@@ -3,7 +3,7 @@ import { initializeDatabase } from "./config/db/sqlite";
 import Logger from "./config/logger";
 import "dotenv/config";
 
-const port = process.env.PORT || 3000;
+const port = process.env.PORT;
 
 const startServer = async () => {
   try {

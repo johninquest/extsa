@@ -1,6 +1,6 @@
 {
-  "name": "extsa",
-  "version": "0.3.24",
+  "name": "polisync-api",
+  "version": "0.3.26",
   "main": "src/server.ts",
   "scripts": {
     "start": "ts-node src/server.ts",
