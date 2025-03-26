@@ -19,4 +19,4 @@ RUN npm run build
 EXPOSE 3000
 
 # Use node to run the app (using the compiled JavaScript)
-CMD ["node", "dist/server.js"]
+CMD ["npx", "nodemon", "dist/server.js"]
