@@ -1,7 +1,8 @@
-import User from '../user/user.model'; // Adjusted import to default import
-import sequelize from '../../config/db/sqlite';
-import { Transaction } from 'sequelize';
-import { sendWelcomeEmail } from '../notification/email'; // Import the email sending function
+// In auth.service.ts
+import userModel, { User } from '../user/user.model';
+import { client } from '../../config/db/libsql';
+import { sendWelcomeEmail } from '../notification/email';
+import { FirebaseUser } from '../../config/firebase';
 
 interface FirebaseUserData {
   uid: string;
@@ -13,10 +14,22 @@ interface FirebaseUserData {
 
 export class AuthService {
   async findOrCreateUser(firebaseUser: FirebaseUserData): Promise<User> {
-    return sequelize.transaction(async (transaction: Transaction) => {
-      const [user, created] = await User.findOrCreate({
-        where: { firebaseUid: firebaseUser.uid },
-        defaults: {
+    try {
+      // Try to find the user first (outside transaction)
+      const existingUser = await userModel.findByFirebaseUid(firebaseUser.uid);
+      
+      if (existingUser) {
+        // User exists, update last login and other fields
+        const updatedUser = await userModel.update(existingUser.id, {
+          displayName: firebaseUser.displayName || existingUser.displayName,
+          photoURL: firebaseUser.photoURL || existingUser.photoURL,
+          lastLogin: new Date()
+        });
+        
+        return updatedUser || existingUser;
+      } else {
+        // User doesn't exist, create a new one
+        const newUser = await userModel.create({
           firebaseUid: firebaseUser.uid,
           email: firebaseUser.email,
           displayName: firebaseUser.displayName,
@@ -24,26 +37,20 @@ export class AuthService {
           provider: firebaseUser.provider,
           role: 'user', // Override model's default 'admin' for social logins
           lastLogin: new Date()
-        },
-        transaction
-      });
-
-      if (created) {
+        });
+        
         // Send welcome email
-        await sendWelcomeEmail(user.email, user.displayName || 'User');
-      } else {
-        await user.update({
-          displayName: firebaseUser.displayName || user.displayName,
-          photoURL: firebaseUser.photoURL || user.photoURL,
-          lastLogin: new Date()
-        }, { transaction });
+        await sendWelcomeEmail(newUser.email, newUser.displayName || 'User');
+        
+        return newUser;
       }
-
-      return user;
-    });
+    } catch (error) {
+      console.error('Error in findOrCreateUser:', error);
+      throw error;
+    }
   }
 
-  async getUserById(id: string): Promise<User | null> {
-    return User.findByPk(id);
+  async getUserById(id: string): Promise<User | undefined> {
+    return userModel.findById(id);
   }
 }

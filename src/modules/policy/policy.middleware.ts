@@ -1,86 +1,90 @@
-// src/modules/policy/policy.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import Policy from './policy.model';
+import policyModel, { Policy } from './policy.model';
 import Logger from '../../config/logger';
+import { FirebaseUser } from '../../config/firebase'; // Import the FirebaseUser type
 
-// Extend the Express Request interface to include policy
+// Extend the Express Request interface to include policy WITHOUT redefining user
 declare global {
   namespace Express {
     interface Request {
-      policy?: any; // Using any here, but ideally should match your Policy model type
+      policy?: Policy; // Only add policy, not user
     }
+  }
+}
+
+// Type guard function to ensure policy exists
+export function ensurePolicyExists(req: Request): asserts req is Request & { policy: Policy } {
+  if (!req.policy) {
+    throw new Error('Policy not found on request object');
   }
 }
 
 /**
  * Middleware to validate policy IDs
  */
-export const validatePolicyId = (req: Request, res: Response, next: NextFunction) => {
+export const validatePolicyId = (req: Request, res: Response, next: NextFunction): void => {
   const policyId = req.params.id;
   
   if (!policyId) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       error: 'Policy ID is required'
     });
+    return; // Return without calling next()
   }
   
-  // You could add additional validation here if needed
-  // For example, checking if the ID matches your expected format with a regex
-  
+  // If validation passes, proceed to next middleware
   next();
 };
 
 /**
  * Middleware to check if the policy exists and belongs to the requesting user
  */
-export const checkPolicyOwnership = async (req: Request, res: Response, next: NextFunction) => {
+export const checkPolicyOwnership = async (req: Request, res: Response, next: NextFunction): Promise<void> => {
   try {
     const policyId = req.params.id;
     
-    // This should be redundant if validatePolicyId is used before this middleware
     if (!policyId) {
-      return res.status(400).json({
+      res.status(400).json({
         success: false,
         error: 'Policy ID is required'
       });
+      return; // Return without calling next()
     }
 
     // Ensure user is authenticated and has an email
     if (!req.user?.email) {
-      return res.status(401).json({
+      res.status(401).json({
         success: false,
         error: 'Authentication required to access this policy'
       });
+      return; // Return without calling next()
     }
 
-    const policy = await Policy.findOne({
-      where: { 
-        id: policyId,
-        created_by: req.user.email 
-      }
-    });
+    const policy = await policyModel.findById(policyId);
 
-    if (!policy) {
-      return res.status(404).json({
+    if (!policy || policy.created_by !== req.user.email) {
+      res.status(404).json({
         success: false,
         error: 'Policy not found or you do not have permission to access it'
       });
+      return; // Return without calling next()
     }
 
-    // Attach the policy to the request object for use in route handlers
     req.policy = policy;
     next();
   } catch (error) {
     Logger.error(`Error checking policy ownership for ID ${req.params.id}`, error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       error: 'Server Error'
     });
+    // No need to return here as this is the last statement
   }
 };
 
 export default {
   validatePolicyId,
-  checkPolicyOwnership
+  checkPolicyOwnership,
+  ensurePolicyExists
 };

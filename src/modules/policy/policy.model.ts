@@ -1,140 +1,199 @@
-// src/modules/policy/policy.model.ts
-import { DataTypes, Model, Optional } from 'sequelize';
+import { sql } from 'drizzle-orm';
+import { sqliteTable, text, integer, real } from 'drizzle-orm/sqlite-core';
+import { eq, isNull } from 'drizzle-orm';
 import { customAlphabet } from 'nanoid';
-import sequelize from '../../config/db/sqlite'; // Adjust the import path as needed
+import db from '../../config/db/libsql';
+import logger from '../../config/logger';
 
 const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
 const generateId = customAlphabet(alphabet, 21);
 
-interface PolicyAttributes {
-  id: string;
-  policy_type: string;
-  policy_number: string;
-  insurance_provider: string;
-  policy_comment?: string;
-  start_date?: Date;
-  end_date: Date;
-  automatic_renewal: boolean;
-  created_by: string;
-  premium: number;
-  payment_frequency: number;
-  agent?: string;
-  claims: string[];
-  deleted_at?: Date; // New field for soft delete
-  created: Date;
-  updated: Date;
-}
+// ==========================================
+// Schema Definition
+// ==========================================
 
-interface PolicyCreationAttributes extends Optional<PolicyAttributes, 'id' | 'policy_comment' | 'start_date' | 'claims' | 'deleted_at' | 'created' | 'updated'> {}
+// Define the policies table schema
+export const policies = sqliteTable('policies', {
+  // Primary key using nanoid
+  id: text('id').primaryKey().$defaultFn(() => generateId()),
+  
+  // Policy fields
+  policy_type: text('policy_type').notNull(),
+  policy_number: text('policy_number').notNull(),
+  insurance_provider: text('insurance_provider').notNull(),
+  policy_comment: text('policy_comment'),
+  
+  // Date fields
+  start_date: integer('start_date', { mode: 'timestamp' }),
+  end_date: integer('end_date', { mode: 'timestamp' }).notNull(),
+  
+  // Boolean fields
+  automatic_renewal: integer('automatic_renewal').notNull().default(0), // 0 for false, 1 for true
+  
+  // User reference
+  created_by: text('created_by').notNull(),
+  
+  // Numeric fields
+  premium: real('premium').notNull(),
+  payment_frequency: integer('payment_frequency').notNull(),
+  
+  // Additional fields
+  agent: text('agent'),
+  claims: text('claims', { mode: 'json' }).$type<string[]>().default(sql`json('[]')`),
+  
+  // Soft delete
+  deleted_at: integer('deleted_at', { mode: 'timestamp' }),
+  
+  // Timestamps
+  created: integer('created', { mode: 'timestamp' })
+    .default(sql`(strftime('%s', 'now'))`),
+  updated: integer('updated', { mode: 'timestamp' })
+    .default(sql`(strftime('%s', 'now'))`)
+});
 
-class Policy extends Model<PolicyAttributes, PolicyCreationAttributes> implements PolicyAttributes {
-  public id!: string;
-  public policy_type!: string;
-  public policy_number!: string;
-  public insurance_provider!: string;
-  public policy_comment?: string;
-  public start_date?: Date;
-  public end_date!: Date;
-  public automatic_renewal!: boolean;
-  public created_by!: string;
-  public premium!: number;
-  public payment_frequency!: number;
-  public agent?: string; // New field for agent - optional
-  public claims!: string[]; // New field for array of claims
-  public deleted_at?: Date; // New field for soft delete
-  public created!: Date;
-  public updated!: Date;
+// Type for inserting a new policy
+export type NewPolicy = typeof policies.$inferInsert;
 
-  // timestamps!
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
-}
+// Type for selecting a policy
+export type Policy = typeof policies.$inferSelect;
 
-Policy.init(
-  {
-    id: {
-      type: DataTypes.STRING(21),
-      primaryKey: true,
-      defaultValue: () => generateId(),
-    },
-    policy_type: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    policy_number: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    insurance_provider: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    policy_comment: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    start_date: {
-      type: DataTypes.DATE,
-      allowNull: true,
-    },
-    end_date: {
-      type: DataTypes.DATE,
-      allowNull: false,
-    },
-    automatic_renewal: {
-      type: DataTypes.BOOLEAN,
-      allowNull: false,
-      defaultValue: false,
-    },
-    created_by: {
-      type: DataTypes.STRING,
-      allowNull: false,
-    },
-    premium: {
-      type: DataTypes.FLOAT,
-      allowNull: false,
-    },
-    payment_frequency: {
-      type: DataTypes.INTEGER,
-      allowNull: false,
-    },
-    agent: {
-      type: DataTypes.STRING,
-      allowNull: true,
-    },
-    claims: {
-      type: DataTypes.JSON, // Using JSON type to store an array of strings
-      allowNull: true,
-      defaultValue: [], // Default to empty array
-    },
-    deleted_at: {
-      type: DataTypes.DATE,
-      allowNull: true,
-      defaultValue: null,
-    },
-    created: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
-    updated: {
-      type: DataTypes.DATE,
-      defaultValue: DataTypes.NOW,
-    },
-  },
-  {
-    sequelize, // Pass the sequelize instance here
-    tableName: 'policies',
-    underscored: true,
-    timestamps: true,
-    createdAt: 'created',
-    updatedAt: 'updated',
+// ==========================================
+// Data Access Methods
+// ==========================================
+
+/**
+ * Create a new policy
+ */
+export async function create(policyData: Omit<NewPolicy, 'id' | 'created' | 'updated'>): Promise<Policy> {
+  try {
+    const result = await db.insert(policies).values({
+      ...policyData,
+      id: generateId(),
+    }).returning();
+    return result[0];
+  } catch (error) {
+    logger.error('Error creating policy:', error);
+    throw error;
   }
-);
+}
 
-// You might want to add associations here
-// For example, if policies belong to users:
-// Policy.belongsTo(User, { foreignKey: 'created_by', as: 'creator' });
-// Policy.belongsTo(Agent, { foreignKey: 'agent', as: 'agentRelation' });
-// Policy.hasMany(Claim, { foreignKey: 'policy_id', as: 'claims' });
+/**
+ * Find a policy by ID
+ */
+export async function findById(id: string): Promise<Policy | undefined> {
+  try {
+    const result = await db
+      .select()
+      .from(policies)
+      .where(eq(policies.id, id))
+      .limit(1);
+    
+    return result[0];
+  } catch (error) {
+    logger.error(`Error finding policy by ID ${id}:`, error);
+    throw error;
+  }
+}
 
-export default Policy;
+/**
+ * Find policies by creator
+ */
+export async function findByCreator(createdBy: string): Promise<Policy[]> {
+  try {
+    const result = await db
+      .select()
+      .from(policies)
+      .where(eq(policies.created_by, createdBy));
+    
+    return result;
+  } catch (error) {
+    logger.error(`Error finding policies for creator ${createdBy}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Update a policy
+ */
+export async function update(id: string, policyData: Partial<Omit<NewPolicy, 'id' | 'created' | 'updated'>>): Promise<Policy | undefined> {
+  try {
+    // Add updated timestamp
+    const dataWithTimestamp = {
+      ...policyData,
+      updated: sql`${Math.floor(Date.now() / 1000)}` // Current timestamp in seconds
+    };
+
+    const result = await db
+      .update(policies)
+      .set(dataWithTimestamp)
+      .where(eq(policies.id, id))
+      .returning();
+    
+    return result[0];
+  } catch (error) {
+    logger.error(`Error updating policy ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Soft delete a policy
+ */
+export async function softDelete(id: string): Promise<boolean> {
+  try {
+    await db
+      .update(policies)
+      .set({ 
+        deleted_at: sql`${Math.floor(Date.now() / 1000)}`, // Current timestamp in seconds
+        updated: sql`${Math.floor(Date.now() / 1000)}`
+      })
+      .where(eq(policies.id, id));
+    
+    return true;
+  } catch (error) {
+    logger.error(`Error soft deleting policy ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Hard delete a policy (permanent deletion)
+ */
+export async function deletePolicy(id: string): Promise<boolean> {
+  try {
+    await db
+      .delete(policies)
+      .where(eq(policies.id, id));
+    
+    return true;
+  } catch (error) {
+    logger.error(`Error deleting policy ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Find all active policies (not soft-deleted)
+ */
+export async function findAll(): Promise<Policy[]> {
+  try {
+    return await db
+      .select()
+      .from(policies)
+      .where(isNull(policies.deleted_at));
+  } catch (error) {
+    logger.error('Error finding all policies:', error);
+    throw error;
+  }
+}
+
+// Export everything as a default object for compatibility with existing code
+export default {
+  create,
+  findById,
+  findByCreator,
+  update,
+  softDelete,
+  deletePolicy,
+  findAll
+};

@@ -7,6 +7,7 @@ WORKDIR /usr/src/app
 # A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
 
+# Install dependencies
 RUN npm install
 
 # Bundle app source
@@ -15,8 +16,8 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
-# Your app binds to port 3000 (assuming this is the default port)
+# Your app binds to port 3000
 EXPOSE 3000
 
-# Use node to run the app (using the compiled JavaScript)
+# Use nodemon to run the app in development mode
 CMD ["npx", "nodemon", "dist/server.js"]

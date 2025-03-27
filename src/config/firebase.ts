@@ -14,10 +14,12 @@ declare global {
 }
 
 // Type for decoded Firebase token
-interface FirebaseUser {
+export interface FirebaseUser {
   uid: string;
   email?: string;
   email_verified?: boolean;
+  emailVerified?: boolean;
+  provider?: string;
   [key: string]: any;
 }
 

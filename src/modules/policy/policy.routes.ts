@@ -1,14 +1,13 @@
-// src/modules/policy/policy.routes.ts
+// Modified imports
 import express from "express";
 import type { Request, Response, NextFunction } from "express";
 import Policy from "./policy.model";
 import { validatePolicy, validatePolicyUpdate } from "./policy.validator";
 import { authLimiter } from "../auth/auth.middleware";
 import { verifyFirebaseToken } from "../../config/firebase";
-import policyMiddleware from "./policy.middleware";
+import policyMiddleware, { ensurePolicyExists } from "./policy.middleware";
 import Logger from "../../config/logger";
 import { asyncHandler } from "../../utils/asyncHandler";
-import { where, col } from "sequelize";
 
 const router = express.Router();
 
@@ -22,6 +21,10 @@ const authWrapper = (req: any, res: any, next: any) => {
 
 // Apply Firebase authentication
 router.use(authWrapper);
+
+// Define middleware variables for better readability
+const idValidation = policyMiddleware.validatePolicyId;
+const ownershipCheck = policyMiddleware.checkPolicyOwnership;
 
 /**
  * @route GET /api/policies
@@ -43,13 +46,8 @@ router.get(
       });
     }
 
-    const policies = await Policy.findAll({
-      where: [
-        { created_by: req.user.email },
-        where(col("deleted_at"), "IS", null),
-      ],
-      order: [["updated", "DESC"]],
-    });
+    // Using Drizzle's findByCreator method instead of Sequelize's findAll with where clause
+    const policies = await Policy.findByCreator(req.user.email);
 
     Logger.info(`Policies retrieved successfully for user ${req.user.email}`, {
       count: policies.length,
@@ -66,16 +64,6 @@ router.get(
   })
 );
 
-// Type-safe middleware wrapper for ownership check
-const ownershipCheck = (req: any, res: any, next: any) => {
-  policyMiddleware.checkPolicyOwnership(req, res, next);
-};
-
-// Type-safe middleware wrapper for ID validation
-const idValidation = (req: any, res: any, next: any) => {
-  policyMiddleware.validatePolicyId(req, res, next);
-};
-
 /**
  * @route GET /api/policies/:id
  * @desc Get a single policy by ID
@@ -86,7 +74,10 @@ router.get(
   idValidation,
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
-    // Check if policy is deleted
+    // Apply the type guard to ensure req.policy exists
+    ensurePolicyExists(req);
+    
+    // Now TypeScript knows req.policy is defined
     if (req.policy.deleted_at) {
       Logger.warn(`Attempt to access deleted policy`, {
         policyId: req.params.id,
@@ -146,7 +137,7 @@ router.post(
         method: "POST",
         url: req.originalUrl,
         user: req.user.email,
-        payload: JSON.stringify(req.body).substring(0, 200), // Log partial payload for debugging
+        payload: JSON.stringify(req.body).substring(0, 200),
       });
       return res.status(400).json({
         success: false,
@@ -185,6 +176,9 @@ router.put(
   idValidation,
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
+    // Apply the type guard to ensure req.policy exists
+    ensurePolicyExists(req);
+    
     // Check if policy is deleted
     if (req.policy.deleted_at) {
       Logger.warn(`Attempt to update deleted policy`, {
@@ -246,8 +240,8 @@ router.put(
       });
     }
 
-    // Update the policy
-    await req.policy.update(value);
+    // Update the policy using Drizzle's update method
+    const updatedPolicy = await Policy.update(req.params.id, value);
 
     Logger.info(`Policy updated successfully`, {
       policyId: req.params.id,
@@ -260,7 +254,7 @@ router.put(
 
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: updatedPolicy || req.policy,
     });
   })
 );
@@ -275,6 +269,9 @@ router.patch(
   idValidation,
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
+    // Apply the type guard to ensure req.policy exists
+    ensurePolicyExists(req);
+    
     // Check if policy is deleted
     if (req.policy.deleted_at) {
       Logger.warn(`Attempt to patch deleted policy`, {
@@ -337,15 +334,17 @@ router.patch(
     }
 
     // Apply only the submitted fields to the policy
-    const fieldsToUpdate = Object.keys(value);
+    const fieldsToUpdate = Object.keys(value).filter(field => 
+      field !== "id" && field !== "created_by" && field !== "deleted_at"
+    );
+    
+    const updateData: Record<string, any> = {};
     for (const field of fieldsToUpdate) {
-      if (field !== "id" && field !== "created_by" && field !== "deleted_at") {
-        req.policy[field] = value[field];
-      }
+      updateData[field] = value[field];
     }
 
-    // Save the updated policy
-    await req.policy.save();
+    // Update the policy using Drizzle
+    const updatedPolicy = await Policy.update(req.params.id, updateData);
 
     Logger.info(`Policy partially updated successfully`, {
       policyId: req.params.id,
@@ -356,9 +355,12 @@ router.patch(
       changedFields: fieldsToUpdate.join(", "),
     });
 
+    // Fetch the updated policy to return
+    const refreshedPolicy = await Policy.findById(req.params.id);
+
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: refreshedPolicy || req.policy,
     });
   })
 );
@@ -373,6 +375,9 @@ router.delete(
   idValidation,
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
+    // Apply the type guard to ensure req.policy exists
+    ensurePolicyExists(req);
+    
     // Check if policy is already deleted
     if (req.policy.deleted_at) {
       Logger.warn(`Attempt to delete already deleted policy`, {
@@ -394,8 +399,8 @@ router.delete(
       number: req.policy.policy_number,
     };
 
-    // Soft delete the policy by setting deleted_at
-    await req.policy.update({ deleted_at: new Date() });
+    // Soft delete the policy using Drizzle's softDelete method
+    await Policy.softDelete(req.params.id);
 
     Logger.info(`Policy soft-deleted successfully`, {
       policyId: policyInfo.id,
@@ -423,6 +428,9 @@ router.post(
   idValidation,
   ownershipCheck,
   asyncHandler(async (req: Request, res: Response) => {
+    // Apply the type guard to ensure req.policy exists
+    ensurePolicyExists(req);
+    
     // Check if policy is actually deleted
     if (!req.policy.deleted_at) {
       Logger.warn(`Attempt to restore a non-deleted policy`, {
@@ -438,7 +446,7 @@ router.post(
     }
 
     // Restore the policy by clearing deleted_at
-    await req.policy.update({ deleted_at: null });
+    const updatedPolicy = await Policy.update(req.params.id, { deleted_at: null });
 
     Logger.info(`Policy restored successfully`, {
       policyId: req.policy.id,
@@ -450,7 +458,7 @@ router.post(
 
     return res.status(200).json({
       success: true,
-      data: req.policy,
+      data: updatedPolicy || req.policy,
     });
   })
 );

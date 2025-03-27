@@ -32,18 +32,18 @@ export class AuthController {
         email: req.user.email || "",
         displayName: req.user.displayName,
         photoURL: req.user.photoURL,
-        provider: req.user.provider,
+        provider: req.user.provider || "unknown", // Provide a default value if undefined
       });
 
       const response: AuthResponse = {
         user: {
           id: user.id,
           email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
-          provider: user.provider,
+          displayName: user.displayName ?? undefined,
+          photoURL: user.photoURL ?? undefined,
+          provider: user.provider ?? undefined,
           role: user.role,
-          lastLogin: user.lastLogin,
+          lastLogin: user.lastLogin ?? undefined,
         },
       };
 
@@ -62,7 +62,9 @@ export class AuthController {
       if (!req.user) {
         throw new Error("User is not authenticated");
       }
-      const user = await this.authService.getUserById(req.user.id);
+      
+      // Use uid instead of id (Firebase auth typically sets uid)
+      const user = await this.authService.getUserById(req.user.uid);
 
       if (!user) {
         res.status(401).json({ authenticated: false });
