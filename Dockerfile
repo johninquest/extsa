@@ -4,7 +4,6 @@ FROM node:20-alpine
 WORKDIR /usr/src/app
 
 # Install app dependencies
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
 
 # Install dependencies
@@ -16,8 +15,14 @@ COPY . .
 # Build TypeScript
 RUN npm run build
 
+# Create an entrypoint script
+RUN echo '#!/bin/sh' > /usr/src/app/docker-entrypoint.sh && \
+    echo 'npx sequelize-cli db:migrate' >> /usr/src/app/docker-entrypoint.sh && \
+    echo 'npx nodemon dist/server.js' >> /usr/src/app/docker-entrypoint.sh && \
+    chmod +x /usr/src/app/docker-entrypoint.sh
+
 # Your app binds to port 3000
 EXPOSE 3000
 
-# Use nodemon to run the app in development mode
-CMD ["npx", "nodemon", "dist/server.js"]
+# Use the entrypoint script
+CMD ["/usr/src/app/docker-entrypoint.sh"]

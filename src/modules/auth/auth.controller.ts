@@ -39,11 +39,11 @@ export class AuthController {
         user: {
           id: user.id,
           email: user.email,
-          displayName: user.displayName ?? undefined,
-          photoURL: user.photoURL ?? undefined,
+          displayName: user.display_name ?? undefined,
+          photoURL: user.photo_url ?? undefined,
           provider: user.provider ?? undefined,
           role: user.role,
-          lastLogin: user.lastLogin ?? undefined,
+          lastLogin: user.last_login ?? undefined,
         },
       };
 
@@ -76,11 +76,11 @@ export class AuthController {
         user: {
           id: user.id,
           email: user.email,
-          displayName: user.displayName,
-          photoURL: user.photoURL,
+          displayName: user.display_name,
+          photoURL: user.photo_url,
           provider: user.provider,
           role: user.role,
-          lastLogin: user.lastLogin,
+          lastLogin: user.last_login,
         },
       });
     } catch (error) {

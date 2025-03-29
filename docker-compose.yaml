@@ -6,12 +6,13 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=http://libsql:8080
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/polisync
       - API_DOMAIN=${API_DOMAIN:-api.polisync.de}
     ports:
       - ${DEV_PORT:-127.0.0.1:3000:3000}
     depends_on:
-      - libsql
+      postgres:
+        condition: service_healthy
     volumes:
       # For development, mount the source code for hot-reloading
       - ${DEV_MOUNT:-./src:/usr/src/app/src:ro}
@@ -28,14 +29,18 @@ services:
     networks:
       - traefik-network
 
-  libsql:
-    image: ghcr.io/tursodatabase/libsql-server:latest
-    volumes:
-      - libsql-data:/var/lib/sqld
+  postgres:
+    image: postgres:17
     environment:
-      - SQLD_NODE_ROLE=primary
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_USER=postgres
+      - POSTGRES_DB=polisync
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -76,7 +81,7 @@ networks:
     driver: bridge
 
 volumes:
-  libsql-data:
+  pgdata:
     driver: local
   traefik-certificates:
     driver: local

@@ -1,197 +1,81 @@
-import { sql } from 'drizzle-orm';
-import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
-import { eq } from 'drizzle-orm';
-import { customAlphabet } from 'nanoid';
-import db from '../../config/db/libsql';
-import logger from '../../config/logger';
+// src/modules/user/user.model.ts
+import { Sequelize, Model, DataTypes, Association } from 'sequelize';
+import { Policy } from '../policy/policy.model';
 
-const alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz';
-const generateId = customAlphabet(alphabet, 21);
+export class User extends Model {
+  declare id: string;
+  declare firebase_uid: string;
+  declare email: string;
+  declare display_name?: string;
+  declare photo_url?: string;
+  declare provider?: string;
+  declare role: string;
+  declare last_login?: Date;
+  declare created_at: Date;
+  declare updated_at: Date;
 
-// ==========================================
-// Schema Definition
-// ==========================================
-
-// Define the users table schema
-export const users = sqliteTable('users', {
-  // Primary key using nanoid
-  id: text('id').primaryKey().$defaultFn(() => generateId()),
-  
-  // Firebase authentication fields
-  firebaseUid: text('firebase_uid').notNull().unique(),
-  email: text('email').notNull().unique(),
-  displayName: text('display_name'),
-  photoURL: text('photo_url'),
-  provider: text('provider'),
-  
-  // User role with check constraint
-  role: text('role').notNull().default('admin'),
-  
-  // Timestamp fields
-  lastLogin: integer('last_login', { mode: 'timestamp' }),
-  createdAt: integer('created_at', { mode: 'timestamp' })
-    .default(sql`(strftime('%s', 'now'))`),
-  updatedAt: integer('updated_at', { mode: 'timestamp' })
-    .default(sql`(strftime('%s', 'now'))`)
-});
-
-// Type for inserting a new user
-export type NewUser = typeof users.$inferInsert;
-
-// Type for selecting a user
-export type User = typeof users.$inferSelect;
-
-// ==========================================
-// Data Access Methods
-// ==========================================
-
-/**
- * Create a new user
- */
-export async function create(userData: Omit<NewUser, 'createdAt' | 'updatedAt'>): Promise<User> {
-  try {
-    const result = await db.insert(users).values(userData).returning();
-    return result[0];
-  } catch (error) {
-    logger.error('Error creating user:', error);
-    throw error;
-  }
+  // Association declarations
+  declare policies?: Policy[];
+  declare static associations: {
+    policies: Association<User, Policy>;
+  };
 }
 
-/**
- * Find a user by ID
- */
-export async function findById(id: string): Promise<User | undefined> {
-  try {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.id, id))
-      .limit(1);
-    
-    return result[0];
-  } catch (error) {
-    logger.error(`Error finding user by ID ${id}:`, error);
-    throw error;
-  }
+export function initializeUserModel(sequelize: Sequelize): typeof User {
+  User.init({
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+      field: 'id'
+    },
+    firebase_uid: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+      field: 'firebase_uid'
+    },
+    email: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false,
+      field: 'email'
+    },
+    display_name: {
+      type: DataTypes.STRING,
+      field: 'display_name'
+    },
+    photo_url: {
+      type: DataTypes.STRING,
+      field: 'photo_url'
+    },
+    provider: {
+      type: DataTypes.STRING,
+      field: 'provider'
+    },
+    role: {
+      type: DataTypes.STRING,
+      defaultValue: 'user',
+      field: 'role'
+    },
+    last_login: {
+      type: DataTypes.DATE,
+      field: 'last_login'
+    }
+  }, {
+    sequelize,
+    modelName: 'User',
+    tableName: 'users',
+    underscored: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
+  });
+
+  // Define associations
+  User.hasMany(Policy, {
+    foreignKey: 'created_by',
+    as: 'policies'
+  });
+
+  return User;
 }
-
-/**
- * Find a user by Firebase UID
- */
-export async function findByFirebaseUid(firebaseUid: string): Promise<User | undefined> {
-  try {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.firebaseUid, firebaseUid))
-      .limit(1);
-    
-    return result[0];
-  } catch (error) {
-    logger.error(`Error finding user by Firebase UID ${firebaseUid}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Find a user by email
- */
-export async function findByEmail(email: string): Promise<User | undefined> {
-  try {
-    const result = await db
-      .select()
-      .from(users)
-      .where(eq(users.email, email))
-      .limit(1);
-    
-    return result[0];
-  } catch (error) {
-    logger.error(`Error finding user by email ${email}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Update a user
- */
-export async function update(id: string, userData: Partial<Omit<NewUser, 'id' | 'createdAt' | 'updatedAt'>>): Promise<User | undefined> {
-  try {
-    // Add updated timestamp
-    const dataWithTimestamp = {
-      ...userData,
-      updatedAt: sql`${Math.floor(Date.now() / 1000)}` // Current timestamp in seconds
-    };
-
-    const result = await db
-      .update(users)
-      .set(dataWithTimestamp)
-      .where(eq(users.id, id))
-      .returning();
-    
-    return result[0];
-  } catch (error) {
-    logger.error(`Error updating user ${id}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Update last login time
- */
-export async function updateLastLogin(id: string): Promise<boolean> {
-  try {
-    await db
-      .update(users)
-      .set({ 
-        lastLogin: sql`${Math.floor(Date.now() / 1000)}`, // Current timestamp in seconds
-        updatedAt: sql`${Math.floor(Date.now() / 1000)}`
-      })
-      .where(eq(users.id, id));
-    
-    return true;
-  } catch (error) {
-    logger.error(`Error updating last login for user ${id}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Delete a user
- */
-export async function deleteUser(id: string): Promise<boolean> {
-  try {
-    await db
-      .delete(users)
-      .where(eq(users.id, id));
-    
-    return true;
-  } catch (error) {
-    logger.error(`Error deleting user ${id}:`, error);
-    throw error;
-  }
-}
-
-/**
- * Find all users
- */
-export async function findAll(): Promise<User[]> {
-  try {
-    return await db.select().from(users);
-  } catch (error) {
-    logger.error('Error finding all users:', error);
-    throw error;
-  }
-}
-
-// Export everything as a default object for compatibility with existing code
-export default {
-  create,
-  findById,
-  findByFirebaseUid,
-  findByEmail,
-  update,
-  updateLastLogin,
-  deleteUser,
-  findAll
-};

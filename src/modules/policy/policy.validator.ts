@@ -5,7 +5,7 @@ export const policySchema = Joi.object({
   id: Joi.string().length(21).optional(),
   policy_type: Joi.string().required(),
   policy_number: Joi.string().required(),
-  insurance_provider: Joi.string().required(),
+  insurer: Joi.string().required(),
   policy_comment: Joi.string().optional().allow(null, ''),
   start_date: Joi.date().optional().allow(null),
   end_date: Joi.date().required(),
@@ -36,7 +36,7 @@ export const validatePolicyUpdate = (policy: any) => {
     [
       'policy_type', 
       'policy_number', 
-      'insurance_provider',
+      'insurer',
       'end_date',
       'created_by',
       'premium',

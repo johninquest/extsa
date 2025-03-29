@@ -1,8 +1,6 @@
-// In auth.service.ts
-import userModel, { User } from '../user/user.model';
-import { client } from '../../config/db/libsql';
+// src/modules/auth/auth.service.ts
+import { User } from '../user/user.model';
 import { sendWelcomeEmail } from '../notification/email';
-import { FirebaseUser } from '../../config/firebase';
 
 interface FirebaseUserData {
   uid: string;
@@ -13,44 +11,61 @@ interface FirebaseUserData {
 }
 
 export class AuthService {
-  async findOrCreateUser(firebaseUser: FirebaseUserData): Promise<User> {
+  async findOrCreateUser(firebaseUser: FirebaseUserData) {
     try {
-      // Try to find the user first (outside transaction)
-      const existingUser = await userModel.findByFirebaseUid(firebaseUser.uid);
-      
-      if (existingUser) {
-        // User exists, update last login and other fields
-        const updatedUser = await userModel.update(existingUser.id, {
-          displayName: firebaseUser.displayName || existingUser.displayName,
-          photoURL: firebaseUser.photoURL || existingUser.photoURL,
-          lastLogin: new Date()
-        });
-        
-        return updatedUser || existingUser;
-      } else {
-        // User doesn't exist, create a new one
-        const newUser = await userModel.create({
+      // Try to find the user first
+      const [user, created] = await User.findOrCreate({
+        where: { firebaseUid: firebaseUser.uid },
+        defaults: {
           firebaseUid: firebaseUser.uid,
           email: firebaseUser.email,
-          displayName: firebaseUser.displayName,
-          photoURL: firebaseUser.photoURL,
+          displayName: firebaseUser.displayName ?? null,
+          photoURL: firebaseUser.photoURL ?? null,
           provider: firebaseUser.provider,
           role: 'user', // Override model's default 'admin' for social logins
           lastLogin: new Date()
+        }
+      });
+
+      // If user exists, update last login and other fields
+      if (!created) {
+        await user.update({
+          displayName: firebaseUser.displayName || user.display_name,
+          photoURL: firebaseUser.photoURL || user.photo_url,
+          lastLogin: new Date()
         });
-        
-        // Send welcome email
-        await sendWelcomeEmail(newUser.email, newUser.displayName || 'User');
-        
-        return newUser;
       }
+
+      // Send welcome email only for newly created users
+      if (created) {
+        await sendWelcomeEmail(
+          user.email, 
+          user.display_name || 'User'
+        );
+      }
+
+      return user;
     } catch (error) {
       console.error('Error in findOrCreateUser:', error);
       throw error;
     }
   }
 
-  async getUserById(id: string): Promise<User | undefined> {
-    return userModel.findById(id);
+  async getUserById(id: string) {
+    return User.findByPk(id);
+  }
+
+  async updateUserProfile(id: string, updateData: Partial<FirebaseUserData>) {
+    const user = await User.findByPk(id);
+    
+    if (!user) {
+      throw new Error('User not found');
+    }
+
+    return user.update({
+      displayName: updateData.displayName ?? user.display_name,
+      photoURL: updateData.photoURL ?? user.photo_url,
+      provider: updateData.provider ?? user.provider
+    });
   }
 }

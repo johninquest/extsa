@@ -1,13 +1,14 @@
+// src/modules/policy/policy.middleware.ts
 import { Request, Response, NextFunction } from 'express';
-import policyModel, { Policy } from './policy.model';
 import Logger from '../../config/logger';
-import { FirebaseUser } from '../../config/firebase'; // Import the FirebaseUser type
+import { Policy } from './policy.model';
+import { User } from '../user/user.model';
 
-// Extend the Express Request interface to include policy WITHOUT redefining user
+// Extend the Express Request interface to include policy
 declare global {
   namespace Express {
     interface Request {
-      policy?: Policy; // Only add policy, not user
+      policy?: Policy;
     }
   }
 }
@@ -30,10 +31,9 @@ export const validatePolicyId = (req: Request, res: Response, next: NextFunction
       success: false,
       error: 'Policy ID is required'
     });
-    return; // Return without calling next()
+    return;
   }
   
-  // If validation passes, proceed to next middleware
   next();
 };
 
@@ -49,26 +49,43 @@ export const checkPolicyOwnership = async (req: Request, res: Response, next: Ne
         success: false,
         error: 'Policy ID is required'
       });
-      return; // Return without calling next()
+      return;
     }
-
-    // Ensure user is authenticated and has an email
+   
     if (!req.user?.email) {
       res.status(401).json({
         success: false,
         error: 'Authentication required to access this policy'
       });
-      return; // Return without calling next()
+      return;
     }
-
-    const policy = await policyModel.findById(policyId);
-
-    if (!policy || policy.created_by !== req.user.email) {
+   
+    const policy = await Policy.findOne({
+      where: { id: policyId },
+      include: [{ 
+        model: User, 
+        as: 'user',
+        required: true // Ensures the user exists
+      }]
+    });
+    
+    if (!policy) {
       res.status(404).json({
         success: false,
-        error: 'Policy not found or you do not have permission to access it'
+        error: 'Policy not found'
       });
-      return; // Return without calling next()
+      return;
+    }
+
+    // Type assertion to access the associated user
+    const policyOwnerEmail = (policy.user as User).email;
+    
+    if (policyOwnerEmail !== req.user.email) {
+      res.status(403).json({
+        success: false,
+        error: 'You do not have permission to access this policy'
+      });
+      return;
     }
 
     req.policy = policy;
@@ -79,7 +96,6 @@ export const checkPolicyOwnership = async (req: Request, res: Response, next: Ne
       success: false,
       error: 'Server Error'
     });
-    // No need to return here as this is the last statement
   }
 };
 

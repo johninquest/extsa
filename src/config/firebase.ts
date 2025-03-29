@@ -17,7 +17,6 @@ declare global {
 export interface FirebaseUser {
   uid: string;
   email?: string;
-  email_verified?: boolean;
   emailVerified?: boolean;
   provider?: string;
   [key: string]: any;
@@ -36,14 +35,6 @@ const initializeFirebase = () => {
       }),
       projectId: process.env.FIREBASE_PROJECT_ID,
     });
-    /* const serviceAccount = JSON.parse(
-      readFileSync(join(__dirname, "firebase-service-account.json"), "utf8")
-    );
-
-    return admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      projectId: process.env.FIREBASE_PROJECT_ID
-    }); */
   } catch (error) {
     Logger.error("Firebase initialization failed", error);
     process.exit(1);

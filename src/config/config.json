@@ -1,0 +1,23 @@
+{
+    "development": {
+      "username": "postgres",
+      "password": "postgres",
+      "database": "polisync",
+      "host": "postgres",
+      "dialect": "postgres"
+    },
+    "test": {
+      "username": "postgres",
+      "password": "postgres",
+      "database": "polisync_test",
+      "host": "postgres",
+      "dialect": "postgres"
+    },
+    "production": {
+      "username": "postgres",
+      "password": "postgres",
+      "database": "polisync",
+      "host": "postgres",
+      "dialect": "postgres"
+    }
+  }
